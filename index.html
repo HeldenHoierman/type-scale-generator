@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Type Scale Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f6f6f4;
+      --surface: #ffffff;
+      --border: #e4e4e0;
+      --border-subtle: #f0f0ec;
+      --text: #111110;
+      --text-muted: #6e6e68;
+      --text-faint: #a8a8a0;
+      --accent: #111110;
+      --accent-fg: #ffffff;
+      --code-bg: #f0f0ec;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+      --error: #dc2626;
+      --success: #16a34a;
+      --highlight: #f0f4ff;
+      --highlight-border: #c7d7fd;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+
+    header {
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--text);
+    }
+
+    header p {
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-size: 13px;
+      max-width: 420px;
+      line-height: 1.6;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 24px;
+      margin-bottom: 12px;
+    }
+
+    .card-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-faint);
+      margin-bottom: 14px;
+    }
+
+    /* ── API Banner ── */
+    .api-banner {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 10px;
+      padding: 18px 22px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .api-banner.visible { display: block; }
+
+    .api-banner strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .api-banner .api-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .api-hint a { color: #2563eb; text-decoration: none; }
+    .api-hint a:hover { text-decoration: underline; }
+
+    .api-row { display: flex; gap: 8px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      background: var(--border-subtle);
+      border-radius: 7px;
+      padding: 3px;
+      width: fit-content;
+      margin-bottom: 16px;
+      gap: 2px;
+    }
+
+    .tab-btn {
+      padding: 6px 14px;
+      font-size: 12.5px;
+      font-weight: 500;
+      background: transparent;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: background 0.15s, color 0.15s;
+      font-family: inherit;
+    }
+
+    .tab-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Search ── */
+    .search-row { display: flex; gap: 8px; }
+
+    .search-results {
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .search-results.visible { display: block; }
+
+    .result-item {
+      padding: 9px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.1s;
+      user-select: none;
+    }
+
+    .result-item:last-child { border-bottom: none; }
+    .result-item:hover { background: var(--bg); }
+    .result-item.selected { background: var(--highlight); }
+
+    .result-name { font-size: 13px; font-weight: 500; }
+    .result-category {
+      font-size: 11px;
+      color: var(--text-faint);
+      background: var(--border-subtle);
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    /* ── Drop Zone ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      color: var(--text-faint);
+      font-size: 13px;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--text-muted);
+      background: var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    .drop-zone strong {
+      display: block;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+      font-size: 13.5px;
+      font-weight: 500;
+    }
+
+    input[type="file"] { display: none; }
+
+    /* ── Metrics ── */
+    .metrics-family {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .metrics-family strong { color: var(--text); font-weight: 600; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .metric-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .metric-box-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-faint);
+      margin-bottom: 5px;
+    }
+
+    .metric-box-value {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .metric-box-unit {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+
+    /* ── Settings ── */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-faint);
+      margin-bottom: 6px;
+    }
+
+    /* ── Inputs ── */
+    select {
+      width: 100%;
+      padding: 8px 11px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236e6e68' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 11px center;
+      padding-right: 30px;
+      cursor: pointer;
+    }
+
+    select:focus {
+      border-color: #a0a0a0;
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="password"] {
+      width: 100%;
+      padding: 8px 11px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+
+    input:focus {
+      border-color: #a0a0a0;
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: opacity 0.15s, background 0.15s;
+      white-space: nowrap;
+      font-family: inherit;
+      line-height: 1;
+    }
+
+    .btn:hover { opacity: 0.82; }
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: var(--accent-fg); }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+
+    /* ── Type Preview ── */
+    .type-preview {
+      margin-bottom: 24px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .preview-row {
+      display: grid;
+      grid-template-columns: 44px 60px 60px 1fr;
+      align-items: baseline;
+      gap: 12px;
+      padding: 3px 0;
+    }
+
+    .preview-row.is-base .preview-text { color: var(--text); }
+
+    .preview-step-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      font-family: system-ui, sans-serif;
+    }
+
+    .preview-step-label.is-base { color: var(--text-muted); }
+
+    .preview-size-label {
+      font-size: 10.5px;
+      color: var(--text-faint);
+      font-variant-numeric: tabular-nums;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+
+    .preview-text {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      color: var(--text);
+      line-height: 1.15;
+    }
+
+    /* ── Output ── */
+    .output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 11px;
+    }
+
+    .output-actions { display: flex; gap: 6px; align-items: center; }
+
+    .copy-feedback {
+      font-size: 11.5px;
+      color: var(--success);
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    .copy-feedback.visible { opacity: 1; }
+
+    pre {
+      background: var(--code-bg);
+      border-radius: 7px;
+      padding: 16px;
+      font-family: "SF Mono", "Cascadia Code", "Fira Code", "Consolas", monospace;
+      font-size: 12.5px;
+      line-height: 1.75;
+      color: var(--text);
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* ── Status / Error ── */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 9px;
+      min-height: 20px;
+    }
+
+    .error-msg {
+      font-size: 12.5px;
+      color: var(--error);
+      margin-top: 8px;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 13px;
+      height: 13px;
+      border: 1.5px solid var(--border);
+      border-top-color: var(--text-muted);
+      border-radius: 50%;
+      animation: spin 0.55s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <header>
+      <h1>Type Scale Generator</h1>
+      <p>Derive a geometric type scale from a font's intrinsic cap-height / x-height ratio.</p>
+    </header>
+
+    <!-- API Key Banner -->
+    <div class="api-banner" id="apiBanner">
+      <strong>Google Fonts API key required</strong>
+      <p class="api-hint">
+        Get a free key at
+        <a href="https://console.cloud.google.com" target="_blank" rel="noopener">console.cloud.google.com</a>
+        → enable the Web Fonts Developer API.
+      </p>
+      <div class="api-row">
+        <input type="password" id="apiKeyInput" placeholder="AIza…" style="flex:1"
+               onkeydown="if(event.key==='Enter') saveApiKey()">
+        <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+      </div>
+      <p id="apiKeyError" class="error-msg hidden"></p>
+    </div>
+
+    <!-- ── Font Selection ── -->
+    <div class="card">
+      <div class="card-label">Select Typeface</div>
+
+      <div class="tabs">
+        <button class="tab-btn active" id="tabGoogleBtn" onclick="switchTab('google')">Google Fonts</button>
+        <button class="tab-btn" id="tabLocalBtn" onclick="switchTab('local')">Local File</button>
+      </div>
+
+      <!-- Google Fonts -->
+      <div class="tab-panel active" id="tabGoogle">
+        <div class="search-row">
+          <input type="text" id="searchInput" placeholder="Search typefaces…"
+                 onkeydown="if(event.key==='Enter') searchFonts()"
+                 style="flex:1">
+          <button class="btn btn-primary" id="searchBtn" onclick="searchFonts()">Search</button>
+        </div>
+        <div class="status" id="searchStatus"></div>
+        <div class="search-results" id="searchResults"></div>
+        <p id="searchError" class="error-msg hidden"></p>
+      </div>
+
+      <!-- Local File -->
+      <div class="tab-panel" id="tabLocal">
+        <div class="drop-zone" id="dropZone"
+             onclick="document.getElementById('fileInput').click()"
+             ondragover="onDragOver(event)"
+             ondragleave="onDragLeave(event)"
+             ondrop="onDrop(event)">
+          <strong>Drop a font file here</strong>
+          .ttf or .otf — or click to browse
+        </div>
+        <input type="file" id="fileInput" accept=".ttf,.otf" onchange="handleFileSelect(event)">
+        <div class="status" id="fileStatus"></div>
+        <p id="fileError" class="error-msg hidden"></p>
+      </div>
+    </div>
+
+    <!-- ── Metrics ── -->
+    <div class="card hidden" id="metricsCard">
+      <div class="card-label">Font Metrics</div>
+      <div class="metrics-family">Selected: <strong id="selectedFamily">—</strong></div>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <div class="metric-box-label">Cap Height</div>
+          <div class="metric-box-value" id="capHeightVal">—</div>
+          <div class="metric-box-unit">font units</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-label">x-Height</div>
+          <div class="metric-box-value" id="xHeightVal">—</div>
+          <div class="metric-box-unit">font units</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-label">Ratio</div>
+          <div class="metric-box-value" id="ratioVal">—</div>
+          <div class="metric-box-unit">cap ÷ x-height</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Scale Settings ── -->
+    <div class="card hidden" id="settingsCard">
+      <div class="card-label">Scale Settings</div>
+      <div class="settings-grid">
+        <div>
+          <label for="baseSize">Base Size (px)</label>
+          <input type="number" id="baseSize" value="16" min="1" max="64" step="1">
+        </div>
+        <div>
+          <label for="stepsUp">Steps Above</label>
+          <input type="number" id="stepsUp" value="5" min="0" max="10" oninput="updateTopTrackingLabel()">
+        </div>
+        <div>
+          <label for="stepsDown">Steps Below</label>
+          <input type="number" id="stepsDown" value="2" min="0" max="5" oninput="updateTopTrackingLabel()">
+        </div>
+      </div>
+      <div class="settings-grid" style="margin-top:12px">
+        <div>
+          <label for="bottomTracking"><span id="bottomTrackingLabel">Smallest Step</span> Tracking (em)</label>
+          <input type="number" id="bottomTracking" value="0" step="0.001" placeholder="0">
+        </div>
+        <div>
+          <label for="baseTracking">Base Tracking (em)</label>
+          <input type="number" id="baseTracking" value="0" step="0.001" placeholder="0">
+        </div>
+        <div>
+          <label for="topTracking"><span id="topTrackingLabel">Largest Step</span> Tracking (em)</label>
+          <input type="number" id="topTracking" value="0" step="0.001" placeholder="0">
+        </div>
+      </div>
+      <div style="margin-top:12px; max-width:200px">
+        <label for="curveType">Interpolation Curve</label>
+        <select id="curveType">
+          <option value="exponential">Exponential</option>
+          <option value="linear">Linear</option>
+          <option value="ease-in">Ease In</option>
+          <option value="ease-out">Ease Out</option>
+          <option value="ease-in-out">Ease In-Out</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" style="margin-top:18px" onclick="generateScale()">Generate Scale</button>
+    </div>
+
+    <!-- ── Output ── -->
+    <div class="card hidden" id="outputCard">
+      <div class="card-label" style="margin-bottom:10px">Type Preview</div>
+      <input type="text" id="previewText" placeholder="The quick brown fox jumps over the lazy dog"
+             style="margin-bottom:16px" oninput="updatePreviewText()">
+      <div class="type-preview" id="typePreview"></div>
+
+      <div class="output-header">
+        <span class="card-label" style="margin-bottom:0">CSS Output</span>
+        <div class="output-actions">
+          <button class="btn btn-secondary btn-sm" onclick="copyCSS()">Copy</button>
+          <button class="btn btn-secondary btn-sm" onclick="downloadCSS()">Download .css</button>
+          <span class="copy-feedback" id="copyFeedback">Copied</span>
+        </div>
+      </div>
+      <pre id="cssOutput"></pre>
+    </div>
+
+  </div>
+
+  <script>
+    let currentFamily = null;
+    let currentRatio  = null;
+    let currentFontStack = null;
+    let currentCSS    = "";
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+
+    async function init() {
+      try {
+        const res  = await fetch("/api/config");
+        const data = await res.json();
+        if (!data.configured) showApiBanner();
+      } catch (_) { showApiBanner(); }
+    }
+
+    function showApiBanner() {
+      document.getElementById("apiBanner").classList.add("visible");
+    }
+
+    // ── API Key ────────────────────────────────────────────────────────────────
+
+    async function saveApiKey() {
+      const key = document.getElementById("apiKeyInput").value.trim();
+      const err = document.getElementById("apiKeyError");
+      err.classList.add("hidden");
+      if (!key) return;
+
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: key }),
+      });
+
+      if (res.ok) {
+        document.getElementById("apiBanner").classList.remove("visible");
+      } else {
+        err.textContent = "Could not save key — check that it's valid.";
+        err.classList.remove("hidden");
+      }
+    }
+
+    // ── Tabs ───────────────────────────────────────────────────────────────────
+
+    function switchTab(tab) {
+      document.getElementById("tabGoogleBtn").classList.toggle("active", tab === "google");
+      document.getElementById("tabLocalBtn").classList.toggle("active", tab === "local");
+      document.getElementById("tabGoogle").classList.toggle("active", tab === "google");
+      document.getElementById("tabLocal").classList.toggle("active", tab === "local");
+    }
+
+    // ── Google Fonts Search ────────────────────────────────────────────────────
+
+    function setSearchStatus(html) {
+      document.getElementById("searchStatus").innerHTML = html;
+    }
+
+    async function searchFonts() {
+      const q = document.getElementById("searchInput").value.trim();
+      if (!q) return;
+
+      const resultsEl = document.getElementById("searchResults");
+      const errEl     = document.getElementById("searchError");
+      errEl.classList.add("hidden");
+      resultsEl.classList.remove("visible");
+      resultsEl.innerHTML = "";
+      setSearchStatus('<span class="spinner"></span> Searching…');
+
+      try {
+        const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setSearchStatus("");
+
+        if (data.error) {
+          errEl.textContent = data.error;
+          errEl.classList.remove("hidden");
+          return;
+        }
+
+        if (!data.results.length) {
+          setSearchStatus("No results found.");
+          return;
+        }
+
+        resultsEl.classList.add("visible");
+        data.results.forEach(font => {
+          const item = document.createElement("div");
+          item.className = "result-item";
+          item.innerHTML = `
+            <span class="result-name">${font.family}</span>
+            <span class="result-category">${font.category}</span>
+          `;
+          item.onclick = () => selectGoogleFont(font.family, item);
+          resultsEl.appendChild(item);
+        });
+      } catch (_) {
+        setSearchStatus("");
+        errEl.textContent = "Request failed — is the server running?";
+        errEl.classList.remove("hidden");
+      }
+    }
+
+    async function selectGoogleFont(family, el) {
+      document.querySelectorAll(".result-item").forEach(i => i.classList.remove("selected"));
+      el.classList.add("selected");
+      setSearchStatus(`<span class="spinner"></span> Fetching ${family}…`);
+
+      // Load font preview via Google Fonts CSS API
+      loadGoogleFontPreview(family);
+      currentFontStack = `"${family}", sans-serif`;
+
+      await fetchMetrics({ family });
+      setSearchStatus("");
+    }
+
+    function loadGoogleFontPreview(family) {
+      const id = "gf-preview-link";
+      let link = document.getElementById(id);
+      if (!link) {
+        link = document.createElement("link");
+        link.id  = id;
+        link.rel = "stylesheet";
+        document.head.appendChild(link);
+      }
+      link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}&display=swap`;
+    }
+
+    // ── Local File ─────────────────────────────────────────────────────────────
+
+    function onDragOver(e) {
+      e.preventDefault();
+      document.getElementById("dropZone").classList.add("drag-over");
+    }
+
+    function onDragLeave() {
+      document.getElementById("dropZone").classList.remove("drag-over");
+    }
+
+    function onDrop(e) {
+      e.preventDefault();
+      document.getElementById("dropZone").classList.remove("drag-over");
+      const file = e.dataTransfer.files[0];
+      if (file) uploadFont(file);
+    }
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) uploadFont(file);
+    }
+
+    function setFileStatus(html) {
+      document.getElementById("fileStatus").innerHTML = html;
+    }
+
+    async function uploadFont(file) {
+      const errEl = document.getElementById("fileError");
+      errEl.classList.add("hidden");
+      setFileStatus(`<span class="spinner"></span> Reading ${file.name}…`);
+
+      // Register font for preview
+      const objUrl  = URL.createObjectURL(file);
+      const safeName = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9\s-]/g, "_");
+      const styleEl  = document.createElement("style");
+      styleEl.textContent = `@font-face { font-family: "${safeName}"; src: url("${objUrl}"); }`;
+      document.head.appendChild(styleEl);
+      currentFontStack = `"${safeName}", sans-serif`;
+
+      const form = new FormData();
+      form.append("file", file);
+      await fetchMetrics(null, form);
+      setFileStatus("");
+    }
+
+    // ── Metrics Fetch ──────────────────────────────────────────────────────────
+
+    async function fetchMetrics(jsonBody, formData) {
+      try {
+        let res;
+        if (formData) {
+          res = await fetch("/api/metrics", { method: "POST", body: formData });
+        } else {
+          res = await fetch("/api/metrics", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(jsonBody),
+          });
+        }
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          const errId = formData ? "fileError" : "searchError";
+          const el    = document.getElementById(errId);
+          el.textContent = data.error || "Failed to extract metrics.";
+          el.classList.remove("hidden");
+          return;
+        }
+
+        currentFamily = data.family;
+        currentRatio  = data.ratio;
+
+        document.getElementById("selectedFamily").textContent = data.family;
+        document.getElementById("capHeightVal").textContent   = data.cap_height;
+        document.getElementById("xHeightVal").textContent     = data.x_height;
+        document.getElementById("ratioVal").textContent       = data.ratio.toFixed(3);
+
+        document.getElementById("metricsCard").classList.remove("hidden");
+        document.getElementById("settingsCard").classList.remove("hidden");
+        document.getElementById("outputCard").classList.add("hidden");
+      } catch (_) {
+        const errId = formData ? "fileError" : "searchError";
+        document.getElementById(errId).textContent = "Request failed — is the server running?";
+        document.getElementById(errId).classList.remove("hidden");
+      }
+    }
+
+    // ── Scale Generation ───────────────────────────────────────────────────────
+
+    const labelPool = ["5xs", "4xs", "3xs", "2xs", "xs", "sm", "base", "md", "lg", "xl", "2xl", "3xl", "4xl", "5xl", "6xl"];
+
+    function updateTopTrackingLabel() {
+      const stepsUp   = parseInt(document.getElementById("stepsUp").value)   || 5;
+      const stepsDown = parseInt(document.getElementById("stepsDown").value) || 2;
+      const baseIdx   = labelPool.indexOf("base");
+
+      const topIdx   = baseIdx + stepsUp;
+      const topLabel = (topIdx >= 0 && topIdx < labelPool.length) ? labelPool[topIdx] : `step+${stepsUp}`;
+      document.getElementById("topTrackingLabel").textContent = topLabel;
+
+      const bottomIdx   = baseIdx - stepsDown;
+      const bottomLabel = (bottomIdx >= 0 && bottomIdx < labelPool.length) ? labelPool[bottomIdx] : `step-${stepsDown}`;
+      document.getElementById("bottomTrackingLabel").textContent = bottomLabel;
+    }
+
+    async function generateScale() {
+      if (!currentRatio) return;
+
+      const base         = parseFloat(document.getElementById("baseSize").value)    || 16;
+      const stepsUp      = parseInt(document.getElementById("stepsUp").value)       || 5;
+      const stepsDown    = parseInt(document.getElementById("stepsDown").value)     || 2;
+      const baseTracking   = parseFloat(document.getElementById("baseTracking").value)   || 0;
+      const topTracking    = parseFloat(document.getElementById("topTracking").value)    || 0;
+      const bottomTracking = parseFloat(document.getElementById("bottomTracking").value) || 0;
+      const curve          = document.getElementById("curveType").value;
+
+      const res  = await fetch("/api/scale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ratio: currentRatio,
+          base,
+          steps_up:      stepsUp,
+          steps_down:    stepsDown,
+          family:        currentFamily,
+          base_tracking:   baseTracking,
+          top_tracking:    topTracking,
+          bottom_tracking: bottomTracking,
+          curve:           curve,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) return;
+
+      currentCSS = data.css;
+      document.getElementById("cssOutput").textContent = data.css;
+
+      buildPreview(data.steps, base);
+      document.getElementById("outputCard").classList.remove("hidden");
+    }
+
+    function previewText() {
+      const el = document.getElementById("previewText");
+      return (el && el.value.trim()) || "The quick brown fox jumps over the lazy dog";
+    }
+
+    function updatePreviewText() {
+      const text = previewText();
+      document.querySelectorAll(".preview-text").forEach(el => el.textContent = text);
+    }
+
+    function buildPreview(steps, base) {
+      const el = document.getElementById("typePreview");
+      el.innerHTML = "";
+
+      // Render largest → smallest
+      [...steps].reverse().forEach(step => {
+        const isBase = step.size === base;
+        const row    = document.createElement("div");
+        row.className = "preview-row" + (isBase ? " is-base" : "");
+
+        const labelEl = document.createElement("span");
+        labelEl.className = "preview-step-label" + (isBase ? " is-base" : "");
+        labelEl.textContent = step.label;
+
+        const sizeEl = document.createElement("span");
+        sizeEl.className = "preview-size-label";
+        sizeEl.textContent = step.css_value;
+
+        const trackEl = document.createElement("span");
+        trackEl.className = "preview-size-label";
+        trackEl.textContent = step.tracking_css;
+
+        const textEl = document.createElement("span");
+        textEl.className = "preview-text";
+        textEl.textContent = previewText();
+        textEl.style.fontSize     = step.css_value;
+        textEl.style.fontFamily   = currentFontStack || "inherit";
+        textEl.style.letterSpacing = step.tracking_css;
+
+        row.appendChild(labelEl);
+        row.appendChild(sizeEl);
+        row.appendChild(trackEl);
+        row.appendChild(textEl);
+        el.appendChild(row);
+      });
+    }
+
+    // ── Copy / Download ────────────────────────────────────────────────────────
+
+    function copyCSS() {
+      navigator.clipboard.writeText(currentCSS).then(() => {
+        const fb = document.getElementById("copyFeedback");
+        fb.classList.add("visible");
+        setTimeout(() => fb.classList.remove("visible"), 1600);
+      });
+    }
+
+    function downloadCSS() {
+      const blob = new Blob([currentCSS], { type: "text/css" });
+      const a    = document.createElement("a");
+      a.href     = URL.createObjectURL(blob);
+      a.download = "type-scale.css";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    init();
+    updateTopTrackingLabel();
+  </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+fonttools
+requests
+flask
