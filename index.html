@@ -552,27 +552,37 @@
       </div>
       <div class="settings-grid" style="margin-top:12px">
         <div>
-          <label for="bottomTracking"><span id="bottomTrackingLabel">Smallest Step</span> Tracking (em)</label>
+          <label for="bottomTracking"><span id="bottomTrackingLabel">Smallest Step</span> Tracking (<span class="tracking-unit-label">em</span>)</label>
           <input type="number" id="bottomTracking" value="0" step="0.001" placeholder="0">
         </div>
         <div>
-          <label for="baseTracking">Base Tracking (em)</label>
+          <label for="baseTracking">Base Tracking (<span class="tracking-unit-label">em</span>)</label>
           <input type="number" id="baseTracking" value="0" step="0.001" placeholder="0">
         </div>
         <div>
-          <label for="topTracking"><span id="topTrackingLabel">Largest Step</span> Tracking (em)</label>
+          <label for="topTracking"><span id="topTrackingLabel">Largest Step</span> Tracking (<span class="tracking-unit-label">em</span>)</label>
           <input type="number" id="topTracking" value="0" step="0.001" placeholder="0">
         </div>
       </div>
-      <div style="margin-top:12px; max-width:200px">
-        <label for="curveType">Interpolation Curve</label>
-        <select id="curveType">
-          <option value="exponential">Exponential</option>
-          <option value="linear">Linear</option>
-          <option value="ease-in">Ease In</option>
-          <option value="ease-out">Ease Out</option>
-          <option value="ease-in-out">Ease In-Out</option>
-        </select>
+      <div style="margin-top:12px; display:flex; gap:20px; align-items:flex-start">
+        <div style="max-width:200px; flex:0 0 200px">
+          <label for="curveType">Interpolation Curve</label>
+          <select id="curveType">
+            <option value="exponential">Exponential</option>
+            <option value="linear">Linear</option>
+            <option value="ease-in">Ease In</option>
+            <option value="ease-out">Ease Out</option>
+            <option value="ease-in-out">Ease In-Out</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin-bottom:6px">Tracking Unit</div>
+          <div class="tabs" style="margin-bottom:0">
+            <button class="tab-btn active" id="unitEm"  onclick="setTrackingUnit('em')">em</button>
+            <button class="tab-btn"        id="unitPx"  onclick="setTrackingUnit('px')">px</button>
+            <button class="tab-btn"        id="unitPct" onclick="setTrackingUnit('‰')">‰</button>
+          </div>
+        </div>
       </div>
       <button class="btn btn-primary" style="margin-top:18px" onclick="generateScale()">Generate Scale</button>
     </div>
@@ -602,6 +612,8 @@
     let currentRatio  = null;
     let currentFontStack = null;
     let currentCSS    = "";
+    let currentSteps  = null;
+    let currentBase   = null;
 
     // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -837,9 +849,9 @@
       const base         = parseFloat(document.getElementById("baseSize").value)    || 16;
       const stepsUp      = parseInt(document.getElementById("stepsUp").value)       || 5;
       const stepsDown    = parseInt(document.getElementById("stepsDown").value)     || 2;
-      const baseTracking   = parseFloat(document.getElementById("baseTracking").value)   || 0;
-      const topTracking    = parseFloat(document.getElementById("topTracking").value)    || 0;
-      const bottomTracking = parseFloat(document.getElementById("bottomTracking").value) || 0;
+      const baseTracking   = toEm(parseFloat(document.getElementById("baseTracking").value)   || 0);
+      const topTracking    = toEm(parseFloat(document.getElementById("topTracking").value)    || 0);
+      const bottomTracking = toEm(parseFloat(document.getElementById("bottomTracking").value) || 0);
       const curve          = document.getElementById("curveType").value;
 
       const res  = await fetch("/api/scale", {
@@ -861,7 +873,9 @@
       const data = await res.json();
       if (!res.ok) return;
 
-      currentCSS = data.css;
+      currentCSS   = data.css;
+      currentSteps = data.steps;
+      currentBase  = base;
       document.getElementById("cssOutput").textContent = data.css;
 
       buildPreview(data.steps, base);
@@ -876,6 +890,21 @@
     function updatePreviewText() {
       const text = previewText();
       document.querySelectorAll(".preview-text").forEach(el => el.textContent = text);
+    }
+
+    function formatTrackingDisplay(step) {
+      const t = step.tracking;
+      if (trackingUnit === "px") {
+        const px = t * step.size;
+        const s = Math.abs(px) < 0.005 ? "0" : (t > 0 ? "+" : "") + px.toFixed(2).replace(/\.?0+$/, "");
+        return s + "px";
+      }
+      if (trackingUnit === "‰") {
+        const pm = t * 1000;
+        const s = Math.abs(pm) < 0.05 ? "0" : (t > 0 ? "+" : "") + pm.toFixed(1).replace(/\.?0+$/, "");
+        return s + "‰";
+      }
+      return step.tracking_css;
     }
 
     function buildPreview(steps, base) {
@@ -897,14 +926,14 @@
         sizeEl.textContent = step.css_value;
 
         const trackEl = document.createElement("span");
-        trackEl.className = "preview-size-label";
-        trackEl.textContent = step.tracking_css;
+        trackEl.className = "preview-size-label tracking-display";
+        trackEl.textContent = formatTrackingDisplay(step);
 
         const textEl = document.createElement("span");
         textEl.className = "preview-text";
         textEl.textContent = previewText();
-        textEl.style.fontSize     = step.css_value;
-        textEl.style.fontFamily   = currentFontStack || "inherit";
+        textEl.style.fontSize      = step.css_value;
+        textEl.style.fontFamily    = currentFontStack || "inherit";
         textEl.style.letterSpacing = step.tracking_css;
 
         row.appendChild(labelEl);
@@ -913,6 +942,39 @@
         row.appendChild(textEl);
         el.appendChild(row);
       });
+    }
+
+    // ── Tracking Unit ──────────────────────────────────────────────────────────
+
+    let trackingUnit = "em";
+
+    function setTrackingUnit(unit) {
+      trackingUnit = unit;
+      ["unitEm", "unitPx", "unitPct"].forEach(id => document.getElementById(id).classList.remove("active"));
+      const idMap = { em: "unitEm", px: "unitPx", "‰": "unitPct" };
+      document.getElementById(idMap[unit]).classList.add("active");
+
+      const stepMap = { em: "0.001", px: "0.1", "‰": "1" };
+      ["bottomTracking", "baseTracking", "topTracking"].forEach(id => {
+        document.getElementById(id).step = stepMap[unit];
+      });
+
+      document.querySelectorAll(".tracking-unit-label").forEach(el => el.textContent = unit);
+
+
+      if (currentSteps) {
+        document.querySelectorAll(".tracking-display").forEach((el, i) => {
+          const step = [...currentSteps].reverse()[i];
+          if (step) el.textContent = formatTrackingDisplay(step);
+        });
+      }
+    }
+
+    function toEm(val) {
+      const base = parseFloat(document.getElementById("baseSize").value) || 16;
+      if (trackingUnit === "px")  return val / base;
+      if (trackingUnit === "‰")   return val / 1000;
+      return val;
     }
 
     // ── Copy / Download ────────────────────────────────────────────────────────
